@@ -112,235 +112,157 @@ template<typename T>               void         _end        (T out, int returnVa
 #endif
 	exit(returnValue);
 }
-
-
+template<typename T>
 class SegmentTree
 {
 private:
-	vector<int> treeMx, treeMn, treeSm, pushMx, pushMn, pushSm;
-	int n; 
-
-	void pushMax(int idx)
+	vector<T> tree, //Segment tree 
+			  mem_add,//Data for pushing adding
+			  mem_change;  //Data for pushing changing
+	vector<bool> is_mem_change; //Data to find out is there pushing changing
+	int n;			//Array size
+	string string_f; //String name for binary function(max, min, sum)
+	
+	//Calculate max or min or sum
+	T  f(T a, T b)
 	{
-		if (pushMx[idx] == 0) return;
-		treeMx[idx] += pushMx[idx];
-		if (pushMx.size() > idx * 2) pushMx[idx * 2] += pushMx[idx];
-		if (pushMx.size() > idx * 2 + 1) pushMx[idx * 2 + 1] += pushMx[idx];
-		pushMx[idx] = 0;
+		if (string_f == "max")
+			return a > b ? a : b;
+		else if (string_f == "min")
+			return a < b ? a : b;
+		else if (string_f == "sum")
+			return a + b;
+		else throw("segment tree has wrong func");
 	}
-	void pushMin(int idx)
+	//Push data of mem_add down
+	void push_add(int idx)
 	{
-		if (pushMn[idx] == 0) return;
-		treeMn[idx] += pushMn[idx];
-		if (pushMn.size() > idx * 2) pushMn[idx * 2] += pushMn[idx];
-		if (pushMn.size() > idx * 2 + 1) pushMn[idx * 2 + 1] += pushMn[idx];
-		pushMn[idx] = 0;
+		if (mem_add[idx] == 0) return;
+		tree[idx] += mem_add[idx];
+		if (mem_add.size() > idx << 1) mem_add[idx << 1] += mem_add[idx];
+		if (mem_add.size() > (idx << 1) + 1) mem_add[(idx << 1) + 1] += mem_add[idx];
+		mem_add[idx] = 0;
 	}
-	void pushSum(int idx)
+	//Push data of mem_change down
+	void push_change(int idx)
 	{
-		if (pushSm[idx] == 0) return;
-		treeSm[idx] += pushSm[idx];
-		if (pushSm.size() > idx * 2) pushSm[idx * 2] += pushSm[idx];
-		if (pushSm.size() > idx * 2 + 1) pushSm[idx * 2 + 1] += pushSm[idx];
-		pushSm[idx] = 0;
+		if (!is_mem_change[idx]) return;
+		tree[idx] = mem_change[idx];
+		if (mem_change.size() > idx << 1) mem_change[idx << 1] = mem_change[idx];
+		if (mem_change.size() > (idx << 1) + 1) mem_add[(idx << 1) + 1] = mem_change[idx];
+		is_mem_change[idx] = 0;
 	}
-
+	//Default vals for every f
+	T val_default()
+	{
+		if (string_f == "sum") return 0;
+		if (string_f == "max") return -INT_INFINITY;
+		if (string_f == "min") return INT_INFINITY;
+	}
 public:
-	int RMxQChangePos(int pos, int val, int tl = 0, int tr = -1, int idx = 1)
+	//Query to change element of array
+	T changePos(int pos, T val, int tl = 0, int tr = -1, int idx = 1)
 	{
 		if (tr == -1) tr += n;
 
-		pushMax(idx);
+		push_add(idx);
+		push_change(idx);
 		if (tl == tr)
-			return treeMx[idx] = val;
-		int m = (tl + tr) / 2;
+			return tree[idx] = val;
+		int m = (tl + tr) >> 1;
 		if (pos <= m)
-			return treeMx[idx] = max(RMxQChangePos(pos, val, tl, m, idx * 2), treeMx[idx * 2 + 1]);
-		else return treeMx[idx] = max(RMxQChangePos(pos, val, m + 1, tr, idx * 2 + 1), treeMx[idx * 2]);
+			return tree[idx] = f(changePos(pos, val, tl, m, idx << 1), tree[(idx << 1) + 1]);
+		else return tree[idx] = f(changePos(pos, val, m + 1, tr, (idx << 1) + 1), tree[idx << 1]);
 	}
-	int RMnQChangePos(int pos, int val, int tl = 0, int tr = -1, int idx = 1)
+	//Query to increase element of array
+	T incPos(int pos, T val, int tl = 0, int tr = -1, int idx = 1)
 	{
 		if (tr == -1) tr += n;
 
-		pushMin(idx);
-		if (tl == tr)
-			return treeMn[idx] = val;
-		int m = (tl + tr) / 2;
-		if (pos <= m)
-			return treeMn[idx] = min(RMnQChangePos(pos, val, tl, m, idx * 2), treeMn[idx * 2 + 1]);
-		else return treeMn[idx] = min(RMnQChangePos(pos, val, m + 1, tr, idx * 2 + 1), treeMn[idx * 2]);
-	}
-	int RSQChangePos(int pos, int val, int tl = 0, int tr = -1, int idx = 1)
-	{
-		if (tr == -1) tr += n;
-
-		pushSum(idx);
-		if (tl == tr)
-			return treeSm[idx] = val;
-		int m = (tl + tr) / 2;
-		if (pos <= m)
-			return treeSm[idx] = RSQChangePos(pos, val, tl, m, idx * 2) + treeSm[idx * 2 + 1];
-		else return treeSm[idx] = RSQChangePos(pos, val, m + 1, tr, idx * 2 + 1) + treeSm[idx * 2];
-	}
-
-	int RMxQIncPos(int pos, int val, int tl = 0, int tr = -1, int idx = 1)
-	{
-		if (tr == -1) tr += n;
-
-		pushMax(idx);
+		push_add(idx);
+		push_change(idx);
 		if (tl == tr)
 		{
-			treeMx[idx] += val;
-			pushMax(idx);
-			return treeMx[idx];
+			tree[idx] += val;
+			return tree[idx];
 		}
-		int m = (tl + tr) / 2;
+		int m = (tl + tr) >> 1;
 		if (pos <= m)
-			return treeMx[idx] = max(RMxQChangePos(pos, val, tl, m, idx * 2), treeMx[idx * 2 + 1]);
-		else return treeMx[idx] = max(RMxQChangePos(pos, val, m + 1, tr, idx * 2 + 1), treeMx[idx * 2]);
+			return tree[idx] = f(incPos(pos, val, tl, m, idx << 1), tree[(idx << 1) + 1]);
+		else return tree[idx] = f(incPos(pos, val, m + 1, tr, (idx << 1) + 1), tree[idx << 1]);
 	}
-	int RMnQIncPos(int pos, int val, int tl = 0, int tr = -1, int idx = 1)
+	//Query to get f on segment l-r
+	T get(int l, int r, int tl = 0, int tr = -1, int idx = 1)
 	{
 		if (tr == -1) tr += n;
 
-		pushMin(idx);
-		if (tl == tr)
-		{
-			treeMn[idx] += val;
-			pushMin(idx);
-			return treeMn[idx];
-		}
-		int m = (tl + tr) / 2;
-		if (pos <= m)
-			return treeMn[idx] = min(RMnQChangePos(pos, val, tl, m, idx * 2), treeMn[idx * 2 + 1]);
-		else return treeMn[idx] = min(RMnQChangePos(pos, val, m + 1, tr, idx * 2 + 1), treeMn[idx * 2]);
-	}
-	int RSQIncPos(int pos, int val, int tl = 0, int tr = -1, int idx = 1)
-	{
-		if (tr == -1) tr += n;
-
-		pushSum(idx);
-		if (tl == tr)
-		{
-			treeSm[idx] += val;
-			pushSum(idx);
-			return treeSm[idx];
-		}
-		int m = (tl + tr) / 2;
-		if (pos <= m)
-			return treeSm[idx] = RSQChangePos(pos, val, tl, m, idx * 2) + treeSm[idx * 2 + 1];
-		else return treeSm[idx] = RSQChangePos(pos, val, m + 1, tr, idx * 2 + 1) + treeSm[idx * 2];
-	}
-
-	int getMax(int l, int r, int tl = 0, int tr = -1, int idx = 1)
-	{
-		if (tr == -1) tr += n;
-
-		pushMax(idx);
+		push_add(idx);
+		push_change(idx);
 		if (tl > r || tr < l)
-			return -INT_INFINITY;
+			return val_default();
 		int m = (tl + tr) >> 1;
 		if (tl >= l && tr <= r)
-			return treeMx[idx];
-		return max(getMax(l, r, tl, m, idx << 1), getMax(l, r, m + 1, tr, (idx << 1) + 1));
+			return tree[idx];
+		return f(get(l, r, tl, m, idx << 1), get(l, r, m + 1, tr, (idx << 1) + 1));
 	}
-	int getMin(int l, int r, int tl = 0, int tr = -1, int idx = 1)
+	//Query to change all elements on segment l-r
+	T changeSegment(int l, int r, T val, int tl = 0, int tr = -1, int idx = 1)
 	{
 		if (tr == -1) tr += n;
 
-		pushMin(idx);
+		push_add(idx);
+		push_change(idx);
 		if (tl > r || tr < l)
-			return INT_INFINITY;
-		int m = (tl + tr) / 2;
-		if (tl >= l && tr <= r)
-			return treeMn[idx];
-		return min(getMin(l, r, tl, m, idx * 2), getMin(l, r, m + 1, tr, idx * 2 + 1));
-	}
-	int getSum(int l, int r, int tl = 0, int tr = -1, int idx = 1)
-	{
-		if (tr == -1) tr += n;
-
-		pushSum(idx);
-		if (tl > r || tr < l)
-			return 0;
-		int m = (tl + tr) / 2;
-		if (tl >= l && tr <= r)
-			return treeSm[idx];
-		return getSum(l, r, tl, m, idx * 2) + getSum(l, r, m + 1, tr, idx * 2 + 1);
-	}
-
-	//TODO: ChangeSegment
-
-	int RMxQIncSegment(int l, int r, int val, int tl = 0, int tr = -1, int idx = 1)
-	{
-		if (tr == -1) tr += n;
-
-		pushMax(idx);
-		if (tl > r || tr < l)
-			return treeMx[idx];
+			return tree[idx];
 		int m = (tl + tr) >> 1;
 		if (tl >= l && tr <= r)
 		{
-			pushMx[idx] = val;
-			pushMax(idx);
-			return treeMx[idx];
+			mem_change[idx] = val;
+			is_mem_change[idx] = true;
+			push_change(idx);
+			return tree[idx];
 		}
-		else return treeMx[idx] = max(RMxQIncSegment(l, r, val, tl, m, idx * 2), RMxQIncSegment(l, r, val, m + 1, tr, idx * 2 + 1));
+		else return tree[idx] = f(incSegment(l, r, val, tl, m, idx << 1), incSegment(l, r, val, m + 1, tr, (idx << 1) + 1));
 	}
-	int RMnQIncSegment(int l, int r, int val, int tl = 0, int tr = -1, int idx = 1)
+	//Query to increase all elements on segment l-r
+	T incSegment(int l, int r, T val, int tl = 0, int tr = -1, int idx = 1)
 	{
 		if (tr == -1) tr += n;
 
-		pushMin(idx);
+		push_add(idx);
+		push_change(idx);
 		if (tl > r || tr < l)
-			return treeMn[idx];
-		int m = (tl + tr) / 2;
+			return tree[idx];
+		int m = (tl + tr) >> 1;
 		if (tl >= l && tr <= r)
 		{
-			pushMn[idx] = val;
-			pushMin(idx);
-			return treeMn[idx];
+			mem_add[idx] = val;
+			push_add(idx);
+			return tree[idx];
 		}
-		else return treeMn[idx] = min(RMnQIncSegment(l, r, val, tl, m, idx * 2), RMnQIncSegment(l, r, val, m + 1, tr, idx * 2 + 1));
+		else return tree[idx] = f(incSegment(l, r, val, tl, m, idx << 1), incSegment(l, r, val, m + 1, tr, (idx << 1) + 1));
 	}
-	int RSQIncSegment(int l, int r, int val, int tl = 0, int tr = -1, int idx = 1)
+	//constructor
+	SegmentTree(const vector<T> &mas, const string &string_f, bool emptyArr=0)
 	{
-		if (tr == -1) tr += n;
-
-		pushSum(idx);
-		if (tl > r || tr < l)
-			return treeSm[idx];
-		int m = (tl + tr) / 2;
-		if (tl >= l && tr <= r)
-		{
-			pushSm[idx] = val;
-			pushSum(idx);
-			return treeSm[idx];
-		}
-		else return treeSm[idx] = RSQIncSegment(l, r, val, tl, m, idx * 2) + RSQIncSegment(l, r, val, m + 1, tr, idx * 2 + 1);
-	}
-
-	SegmentTree(vector<int> mas, bool RMxQ, bool RMnQ, bool RSQ)
-	{
+		this->string_f = string_f;
 		n = mas.size();
-		if (RMxQ) treeMx = pushMx = vector<int>(n * 4);
-		if (RMnQ) treeMn = pushMn = vector<int>(n * 4);
-		if (RSQ)  treeSm = pushSm = vector<int>(n * 4);
-		for (int i = 0; i < mas.size(); i++)
-		{
-			if (RMxQ)RMxQChangePos(i, mas[i], 0, n - 1, 1);
-			if (RMnQ)RMnQChangePos(i, mas[i], 0, n - 1, 1);
-			if (RSQ) RSQChangePos(i, mas[i], 0, n - 1, 1);
-		}
+		tree = mem_add = mem_change = vector<T>(n << 2);
+		is_mem_change = vector<bool>(n << 2);
+		if(!emptyArr)
+			for (int i = 0; i < n; i++)
+				changePos(i, mas[i]);
 	}
 	SegmentTree() {}
 };
 class LCA
 {
 private:
-	vector<int> tin, tout;
-	vector<vector<int> > ancs;
-	int timer = 1;
+	vector<int> tin, //Time in of vertex
+				tout; //Time out of vertex
+	vector<vector<int> > ancs; //1, 2, 4, and so on ancestors list for every vertex 
+	//LCA Preprocessing
+	int timer = 1; 
 	void LCA_prep(const vector<vector<int> > &tree, int v, vector<int> &ancestors, int prev=-1)
 	{
 		tin[v] = timer++;
@@ -363,11 +285,13 @@ public:
 		if (tin[v1] > tin[v2] && tout[v1] < tout[v2]) return 1;
 		return 0;
 	}
+	//constructor
 	LCA(const vector<vector<int> > &tree, int v) : tin(tree.size()), tout(tree.size()), ancs(tree.size())
 	{
 		vector<int> trash;
 		LCA_prep(tree, v, trash);
 	}
+	//Query to get LCA for 2 vertices
 	int get(int v1, int v2)
 	{
 		if (v1 == v2) return v1;
@@ -389,18 +313,39 @@ public:
 		return get(v1, v2);
 	}
 };
+
+template<typename T>
 class HeavyLightDecomposition
 {
 private:
-	vector<vector<int> > tree, ways, myEnds;
-	vector<int> endsW, sizes, depth, myWay, myPos;
-	map<pair<int, int>, bool> heavy;
-	vector<SegmentTree> seg_trees;
-	LCA lca;
-	int HeavyDfs(int v, int d = 1LL, int prev = 0LL)
+	vector<vector<int> > tree, //tree itself
+						 ways; //decomposed tree
+	vector<int> endsW, //Ends of ways
+			    sizes, //sizes of subtrees
+				depth, //depth of vertices
+				myWay, //Way number for each vertex
+				myPos; //position of vertex in it's way
+	map<pair<int, int>, bool> heavy; //is edge heavy
+	vector<SegmentTree<T>> seg_trees; //segment trees for ways
+	LCA lca; //Least Common Ancestor finder
+	string string_f; //String name for binary function(max, min, sum)
+
+	//Calculate max or min or sum
+	T  f(T a, T b)
+	{
+		if (string_f == "max")
+			return a > b ? a : b;
+		else if (string_f == "min")
+			return a < b ? a : b;
+		else if (string_f == "sum")
+			return a + b;
+		else throw("segment tree has wrong func");
+	}
+	//Finds depth of vertices and heavy edges
+	int HeavyDfs(int v = 1, int d = 1, int prev = 0) 
 	{
 		depth[v] = d;
-		int c = 1LL;
+		int c = 1;
 		for (auto&i : tree[v])
 			if (i != prev)
 				c += sizes[i] = HeavyDfs(i, d + 1LL, v);
@@ -409,7 +354,8 @@ private:
 				heavy[make_pair(v, i)] = true;
 		return c;
 	}
-	int make_ways(int v, int prev = 0LL)
+	//splits tree into ways of heavy edges and 1 light edge at the end of way
+	int make_ways(int v = 1, int prev = 0)
 	{
 		int res = 0;
 		for (auto&i : tree[v])
@@ -437,89 +383,90 @@ private:
 		}
 		return res;
 	}
-	void createSegs(bool mx=1, bool mn=1, bool sm=1)
+	//initializes segment trees for ways
+	void createSegs()
 	{
 		for (ll i = 0LL; i < seg_trees.size(); i++)
 			if (ways[i].size())
-				seg_trees[i] = SegmentTree(vector<int> (ways[i].size()), mx, mn, sm);
+				seg_trees[i] = SegmentTree<int>(vector<int> (ways[i].size()), string_f, true);
 	}
 
 public:
-	vector<int> vals;
-	int getTreeMax(int a, int b, int lca = -1)
+	vector<int> vals; //values of vertices
+	//Query to get f on way a-b
+	int get(int a, int b, int lca = -1)
 	{
 		if (lca == -1) lca = this->lca.get(a, b);
 
 		int res = 0LL;
-		SegmentTree &aSeg = seg_trees[myWay[a]],
-			&bSeg = seg_trees[myWay[b]];
-		int  aPos = myPos[a],
-			bPos = myPos[b],
-			lcaPos = myPos[lca],
-			aEnd = ways[myWay[a]].size() - 2LL,
-			bEnd = ways[myWay[b]].size() - 2LL;
+		SegmentTree<T> &aSeg = seg_trees[myWay[a]],
+					   &bSeg = seg_trees[myWay[b]];
+		int  aEnd = ways[myWay[a]].size() - 1LL,
+			 bEnd = ways[myWay[b]].size() - 1LL;
 
 		if (depth[a] >= depth[lca])
 			if (depth[endsW[myWay[a]]] >= depth[lca])
 			{
-				res = max(res, aSeg.getMax(aPos, aEnd));
+				res = f(res, aSeg.get(myPos[a], aEnd-1));
 				a = endsW[myWay[a]];
 			}
 			else
 			{
-				res = max(res, aSeg.getMax(aPos, lcaPos));
+				res = f(res, aSeg.get(myPos[a], myPos[lca] -1));
 				a = lca;
 			}
 
 		if (depth[b] >= depth[lca])
 			if (depth[endsW[myWay[b]]] >= depth[lca])
 			{
-				res = max(res, bSeg.getMax(bPos, bEnd));
+				res = f(res, bSeg.get(myPos[b], bEnd-1));
 				b = endsW[myWay[b]];
 			}
 			else
 			{
-				res = max(res, bSeg.getMax(bPos, lcaPos));
+				res = f(res, bSeg.get(myPos[b], myPos[lca] -1));
 				b = lca;
 			}
 
 		if (depth[b] <= depth[lca] && depth[a] <= depth[lca])
-			return max(vals[lca], res);
-		return max(res, getTreeMax(a, b, lca));
+			return f(vals[lca], res);
+		return f(res, get(a, b, lca));
 	}
+	//Query to change vertex value
 	void changeVertex(int v, int val)
 	{
 		vals[v] = val;
-		seg_trees[myWay[v]].RMxQChangePos(myPos[v], vals[v]);
+		seg_trees[myWay[v]].changePos(myPos[v], vals[v]);
 	}
+	//Query to increase vertex value
 	void incVertex(int v, int val)
 	{
 		vals[v] += val;
-		seg_trees[myWay[v]].RMxQChangePos(myPos[v], vals[v]);
+		seg_trees[myWay[v]].incPos(myPos[v], val);
 	}
-	HeavyLightDecomposition(vector<vector<int> > &t) :
-		lca(t, 1),
-		seg_trees(vector<SegmentTree>(t.size() + 1)),
-		tree(t),
-		ways(t.size() + 1)
+
+	//constructor
+	HeavyLightDecomposition(const vector<vector<int> > &t, string string_f) :
+		lca(t, 1),seg_trees(vector<SegmentTree<T>>(t.size() + 1)),
+		tree(t), ways(t.size() + 1), string_f(string_f)
 	{
 		sizes = endsW = depth = vals = myWay = myPos = vector<int>(t.size() + 1LL);
-		HeavyDfs(1);
-		make_ways(1);
-		vector<int> trash;
-		createSegs(1,0,0);
+		HeavyDfs(); make_ways(); createSegs();
 	}
 };
 #pragma endregion custom templates
 
 int main()
 { 
-	_start(START_OPTION::FILE_INPUT/* | START_OPTION::FILE_OUTPUT | START_OPTION::FILE_OUTHERE, "bigwall.in", "bigwall.out"*/);
+	_start(START_OPTION::FILE_INPUT /*
+		| START_OPTION::FILE_OUTPUT 
+		| START_OPTION::FILE_OUTHERE, 
+		"bigwall.in", 
+		"bigwall.out"*/);
 	int n; cin >> n;
 	vector<vector<int> > tree;
 	readUndirGraph(n, n - 1, tree);
-	HeavyLightDecomposition hld(tree);
-
+	HeavyLightDecomposition<int> hld(tree, "max");
 
 	int q; cin >> q;
 	while (q--)
@@ -535,7 +482,7 @@ int main()
 		{
 			int a, b;
 			cin >> a >> b;
-			cout << hld.getTreeMax(a, b) << endl;
+			cout << hld.get(a, b) << endl;
 		}
 	}
 	_end("");
